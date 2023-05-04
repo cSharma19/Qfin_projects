@@ -9,6 +9,7 @@ import numpy as np
 from scipy import stats
 from math import log, sqrt, exp
 import pandas as pd
+import matplotlib.pyplot as plt
 
 
 def simpath(S0, r, sigma, ttm, numSteps, numPaths):
@@ -134,6 +135,37 @@ def hedge_error(call0, df, strike, sigma, ttm, r, numSteps, numPaths, quantity):
     hedge_results = call0 - np.absolute(cashflow_end) * np.exp(-r * ttm/numSteps)/quantity
     
     return [hedge_results, cashflow_end]
+#%%
+
+def stoploss(sigma, strike, ttm, epsilon, numSteps, numPaths, call):
+    path = simpath(S0, r, sigma, ttm, numSteps, numPaths)
+    
+    run_pnl = np.zeros((numSteps, numPaths))
+        
+    for col in range(0, numPaths):
+        for row in range(1, numSteps):                
+            
+            if path[row-1, col] <= strike \
+                and path[row, col] > strike:
+                    hedge_cashflow = -(strike + epsilon) * quantity
+                    run_pnl[row, col] = hedge_cashflow
+            elif path[row-1, col] >= strike \
+                and path[row, col] < strike:    
+                    hedge_cashflow = (strike - epsilon) * quantity
+                    run_pnl[row, col] = hedge_cashflow
+            else:
+                    hedge_cashflow = 0
+                    run_pnl[row, col] = hedge_cashflow
+                
+    cml_pnl = sum(run_pnl).reshape(1, numPaths) * np.exp(-r * ttm/numSteps)
+    slhedge_error = cml_pnl/quantity - call0
+    stdev_pnl = np.std(cml_pnl)
+    hedge_perf = stdev_pnl/call
+    hedge_perf2 = cml_pnl/call
+    
+    
+    
+    return path, run_pnl, cml_pnl, slhedge_error, hedge_perf, hedge_perf2, stdev_pnl
  #%%
 S0 = 100
 strike = 100
@@ -142,17 +174,17 @@ strike = 100
 ttm = 1
 r = 0.05
 sigma = 0.50
-numSteps = 5
-numPaths = 1
+numSteps = 50
+numPaths = 5
 mu = 0
 # ttm = (M - t).days/365
 epsilon = 0.02
 quantity = 10000
 call0 = bs_call(S0, strike, sigma, ttm, r)
-hedge_strat = delta_hedge(S0, strike, sigma, r, ttm, numSteps, numPaths, quantity)
-path = simpath(S0, r, sigma, ttm, numSteps, numPaths)
-hedge_results = hedge_error(call0, hedge_strat, strike, sigma, ttm, r, numSteps, numPaths, quantity)
+# hedge_strat = delta_hedge(S0, strike, sigma, r, ttm, numSteps, numPaths, quantity)
+# path = simpath(S0, r, sigma, ttm, numSteps, numPaths)
+# hedge_results = hedge_error(call0, hedge_strat, strike, sigma, ttm, r, numSteps, numPaths, quantity)
+stoploss_strat = stoploss(sigma, strike, ttm, epsilon, numSteps, numPaths, call0)
 
-# #%%
-# for i in range(1, numSteps-1):
-#     print(i)
+
+
